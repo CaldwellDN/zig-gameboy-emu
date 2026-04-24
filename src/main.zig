@@ -5,7 +5,7 @@ const GameBoy = @import("GameBoy.zig").GameBoy;
 const gameboy_emu_zig = @import("gameboy_emu_zig");
 
 pub fn main(init: std.process.Init) !void {
-    var gb = try GameBoy.init(init.io, init.gpa, "SuperMarioLand.gb");
+    var gb = try GameBoy.init(init.io, init.gpa, "Tetris.gb");
 
     std.debug.print("Boot ROM Start: 0x{X:0>2}\n", .{gb.bus.read(0x0000)});
 
