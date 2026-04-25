@@ -7,10 +7,16 @@ pub const GameBoy = struct {
     bus: Bus,
     allocator: std.mem.Allocator,
 
-    pub fn init(io: std.Io, alloc: std.mem.Allocator, rom_path: []const u8) !GameBoy {
-        const cwd = std.Io.Dir.cwd();
+    pub fn init(io: std.Io, alloc: std.mem.Allocator, rom_path: ?[]const u8) !GameBoy {
+        var rom_data: []u8 = &[_]u8{};
 
-        const rom_data = try cwd.readFileAlloc(io, rom_path, alloc, @enumFromInt(8 * 1024 * 1024));
+        if (rom_path != null) {
+            const cwd = std.Io.Dir.cwd();
+            rom_data = try cwd.readFileAlloc(io, rom_path.?, alloc, @enumFromInt(8 * 1024 * 1024));
+        } else {
+            rom_data = try alloc.alloc(u8, 0x8000);
+            @memset(rom_data, 0);
+        }
 
         return GameBoy{
             .registers = .{},
@@ -377,3 +383,122 @@ pub const GameBoy = struct {
         }
     }
 };
+
+test "LD tests" {
+    const io = std.testing.io;
+    const gpa = std.testing.allocator;
+
+    var gb = try GameBoy.init(io, gpa, null);
+    defer gb.deinit();
+
+    inline for (0..8) |dest| {
+        inline for (0..8) |src| {
+            // Skip 6 (HL) for now as it involves memory reads/writes
+            if (dest == 6 or src == 6) continue;
+            // Skip 0x76 (HALT) which is tucked inside this range
+            const opcode = @as(u8, 0x40 | (dest << 3) | src);
+            if (opcode == 0x76) continue;
+
+            const test_val: u8 = @intCast(0xAA + src);
+            gb.setRegValue(@intCast(src), test_val);
+
+            gb.execute(opcode);
+
+            try std.testing.expectEqual(test_val, gb.getRegValue(@intCast(dest)));
+        }
+    }
+}
+
+test "INC 8-bit register tests" {
+    const io = std.testing.io;
+    const gpa = std.testing.allocator;
+
+    var gb = try GameBoy.init(io, gpa, null);
+    defer gb.deinit();
+
+    const opcodes = [_]u8{ 0x04, 0x0C, 0x14, 0x1C, 0x24, 0x2C, 0x3C }; // Removed 0x34 (HL) for now
+
+    for (opcodes) |opcode| {
+        const reg_idx: u3 = @intCast((opcode >> 3) & 0x7);
+
+        const test_vals = [_]u8{ 0x0F, 0x1E, 0xFF }; // 15, 30, 255
+        for (test_vals) |test_val| {
+            gb.setRegValue(reg_idx, test_val);
+            gb.registers.set_f(0);
+
+            gb.execute(opcode);
+
+            const expected: u8 = test_val +% 1;
+            const actual = gb.getRegValue(reg_idx);
+
+            std.testing.expectEqual(expected, actual) catch |err| {
+                std.debug.print("\nFailed on Opcode 0x{X:0>2} (Register Index: {})\n", .{ opcode, reg_idx });
+                return err;
+            };
+            try std.testing.expectEqual(false, gb.registers.get_flag(Registers.Flags.N));
+
+            switch (test_val) {
+                0x0F => {
+                    try std.testing.expectEqual(false, gb.registers.get_flag(Registers.Flags.Z));
+                    try std.testing.expectEqual(true, gb.registers.get_flag(Registers.Flags.H));
+                },
+                0x1E => {
+                    try std.testing.expectEqual(false, gb.registers.get_flag(Registers.Flags.Z));
+                    try std.testing.expectEqual(false, gb.registers.get_flag(Registers.Flags.H));
+                },
+                0xFF => {
+                    try std.testing.expectEqual(true, gb.registers.get_flag(Registers.Flags.Z));
+                    try std.testing.expectEqual(true, gb.registers.get_flag(Registers.Flags.H));
+                },
+                else => unreachable,
+            }
+        }
+    }
+}
+
+test "DEC 8-bit register tests" {
+    const io = std.testing.io;
+    const gpa = std.testing.allocator;
+
+    var gb = try GameBoy.init(io, gpa, null);
+    defer gb.deinit();
+
+    const opcodes = [_]u8{ 0x05, 0x0D, 0x15, 0x1D, 0x25, 0x2D, 0x3D }; // Removed 0x34 (HL) for now
+
+    for (opcodes) |opcode| {
+        const reg_idx: u3 = @intCast((opcode >> 3) & 0x7);
+
+        const test_vals = [_]u8{ 0x01, 0x10, 0x00 }; // 1, 16, 0
+        for (test_vals) |test_val| {
+            gb.setRegValue(reg_idx, test_val);
+            gb.registers.set_f(0);
+
+            gb.execute(opcode);
+
+            const expected: u8 = test_val -% 1;
+            const actual = gb.getRegValue(reg_idx);
+
+            std.testing.expectEqual(expected, actual) catch |err| {
+                std.debug.print("\nFailed on Opcode 0x{X:0>2} (Register Index: {})\n", .{ opcode, reg_idx });
+                return err;
+            };
+            try std.testing.expectEqual(true, gb.registers.get_flag(Registers.Flags.N));
+
+            switch (test_val) {
+                0x01 => {
+                    try std.testing.expectEqual(true, gb.registers.get_flag(Registers.Flags.Z));
+                    try std.testing.expectEqual(false, gb.registers.get_flag(Registers.Flags.H));
+                },
+                0x10 => {
+                    try std.testing.expectEqual(false, gb.registers.get_flag(Registers.Flags.Z));
+                    try std.testing.expectEqual(true, gb.registers.get_flag(Registers.Flags.H));
+                },
+                0x00 => {
+                    try std.testing.expectEqual(false, gb.registers.get_flag(Registers.Flags.Z));
+                    try std.testing.expectEqual(true, gb.registers.get_flag(Registers.Flags.H));
+                },
+                else => unreachable,
+            }
+        }
+    }
+}
