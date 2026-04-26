@@ -121,6 +121,20 @@ pub const GameBoy = struct {
                 self.registers.set_flag(Registers.Flags.C, bit7 == 1);
             },
 
+            0x08 => { // LD a16, SP
+                const low_a16: u8 = self.bus.read(self.registers.pc);
+                const high_a16: u8 = self.bus.read(self.registers.pc + 1);
+                self.registers.pc += 2;
+
+                const a16: u16 = (@as(u16, high_a16) << 8) | low_a16;
+
+                const low_sp: u8 = @truncate(self.registers.sp);
+                const high_sp: u8 = @intCast(self.registers.sp >> 8);
+
+                self.bus.write(a16, low_sp);
+                self.bus.write(a16 +% 1, high_sp);
+            },
+
             0x17 => { // RLA
                 const a = self.registers.a();
                 const old_carry: u8 = if (self.registers.get_flag(Registers.Flags.C)) 1 else 0;
