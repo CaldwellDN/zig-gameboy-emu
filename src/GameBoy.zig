@@ -502,3 +502,41 @@ test "DEC 8-bit register tests" {
         }
     }
 }
+
+// NOTE: Add AND and OR opcode tests below once implemented.
+
+test "XOR Register Tests" {
+    const io = std.testing.io;
+    const gpa = std.testing.allocator;
+
+    var gb = try GameBoy.init(io, gpa, null);
+    defer gb.deinit();
+    const opcodes = [_]u8{ 0xA8, 0xA9, 0xAA, 0xAB, 0xAC, 0xAD, 0xAF }; // Removed 0xAE (HL) for now
+
+    // Going to test three values XOR'd against 21 (0x15)
+    const a_val: u8 = 0x15;
+    const test_vals = [_]u8{ 0x00, 0x0A, 0x15 };
+
+    for (opcodes) |opcode| {
+        const reg_idx: u3 = @intCast(opcode & 0x7);
+        for (test_vals) |test_val| {
+            gb.setRegValue(reg_idx, test_val);
+
+            // If the opcode is XOR A, it will always equal 0;
+            const expected: u8 = if (opcode != 0xAF) a_val ^ test_val else 0;
+            gb.registers.set_a(a_val);
+
+            gb.execute(opcode);
+
+            const actual = gb.registers.a();
+            std.testing.expectEqual(expected, actual) catch |err| {
+                std.debug.print("\nFailed on Opcode 0x{X:0>2} (Register Index: {})\n", .{ opcode, reg_idx });
+                return err;
+            };
+            try std.testing.expectEqual(expected == 0, gb.registers.get_flag((Registers.Flags.Z)));
+            try std.testing.expectEqual(false, gb.registers.get_flag(Registers.Flags.N));
+            try std.testing.expectEqual(false, gb.registers.get_flag(Registers.Flags.H));
+            try std.testing.expectEqual(false, gb.registers.get_flag(Registers.Flags.C));
+        }
+    }
+}
