@@ -565,6 +565,47 @@ test "DEC 8-bit register tests" {
     }
 }
 
+// ADD + SUB Operation Tests (NOTE: need to implement SUB)
+
+test "ADD Register Tests" {
+    const io = std.testing.io;
+    const gpa = std.testing.allocator;
+
+    var gb = try GameBoy.init(io, gpa, null);
+    defer gb.deinit();
+    gb.bus.boot_rom_enabled = false;
+
+    // 0: basic check; 1: Half-Carry Check; 241: Carry Check & Zero Check
+    const test_vals = [_]u8{ 0x00, 0x01, 0xF1 }; // 0, 1, 241
+    // a_val is always the register value for A
+    const a_val: u8 = 0x0F; // 15
+
+    for (0x80..0x87) |opcode_usize| {
+        const opcode: u16 = @intCast(opcode_usize);
+        const reg_idx: u3 = @intCast(opcode & 0x7);
+
+        if (opcode == 0x86) gb.registers.hl = 0xC000; // If performing HL opcode, we write the number to work_ram
+
+        for (test_vals) |test_val| {
+            gb.registers.set_a(a_val);
+            gb.setRegValue(reg_idx, test_val);
+
+            gb.execute(opcode);
+            const expected: u8 = test_val +% a_val;
+            const actual: u8 = gb.registers.a();
+
+            std.testing.expectEqual(expected, actual) catch |err| {
+                std.debug.print("\nFailed on Opcode 0x{X:0>2}: Expected 0x{X:0>4}, got 0x{X:0>4}\n", .{ opcode, expected, actual });
+                return err;
+            };
+            try std.testing.expectEqual(expected == 0, gb.registers.get_flag(Registers.Flags.Z));
+            try std.testing.expectEqual(false, gb.registers.get_flag(Registers.Flags.N));
+            try std.testing.expectEqual((test_val & 0x0F) + (a_val & 0x0F) > 0x0F, gb.registers.get_flag(Registers.Flags.H));
+            try std.testing.expectEqual(@as(u16, test_val) + a_val > 0xFF, gb.registers.get_flag(Registers.Flags.C));
+        }
+    }
+}
+
 // NOTE: Add AND and OR opcode tests below once implemented.
 
 test "XOR Register Tests" {
