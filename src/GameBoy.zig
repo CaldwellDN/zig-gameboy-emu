@@ -270,6 +270,26 @@ pub const GameBoy = struct {
                 self.registers.set_flag(Registers.Flags.C, result > 0xFF);
             },
 
+            0x88...0x8F => { // ADC register operations + HL
+                const a_val: u8 = self.registers.a();
+                const reg_idx: u3 = @intCast(opcode & 0x7);
+                const reg_val: u8 = if (reg_idx == 6) self.bus.read(self.registers.hl) else self.getRegValue(reg_idx);
+
+                const carry_val: u8 = if (self.registers.get_flag(Registers.Flags.C)) 1 else 0;
+
+                const result: u16 = @as(u16, a_val) + reg_val + carry_val;
+                const result_u8: u8 = @as(u8, @intCast(result & 0xFF));
+
+                const H_check = (a_val & 0x0F) + (reg_val & 0x0F) + carry_val > 0x0F;
+
+                self.registers.set_a(result_u8);
+
+                self.registers.set_flag(Registers.Flags.Z, result_u8 == 0);
+                self.registers.set_flag(Registers.Flags.N, false);
+                self.registers.set_flag(Registers.Flags.H, H_check);
+                self.registers.set_flag(Registers.Flags.C, result > 0xFF);
+            },
+
             0xA8...0xAD, 0xAF => { // XOR 8-bit
                 const source_bits: u3 = @intCast(opcode & 0x7);
                 const source_val = self.getRegValue(source_bits);
