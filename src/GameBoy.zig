@@ -346,7 +346,16 @@ pub const GameBoy = struct {
                 self.bus.write(self.registers.sp, vals[1]);
             },
 
-            0xC9 => {},
+            0xC9 => { // RET
+                const low = self.bus.read(self.registers.sp);
+                self.registers.sp +%= 1;
+
+                const high = self.bus.read(self.registers.sp);
+                self.registers.sp +%= 1;
+
+                const address = (@as(u16, high) << 8) | low;
+                self.registers.pc = address;
+            },
 
             0xCC => { // CALL Z, a16
                 const low = self.bus.read(self.registers.pc);
