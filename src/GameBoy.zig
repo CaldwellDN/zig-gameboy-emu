@@ -377,7 +377,7 @@ pub const GameBoy = struct {
             },
 
             else => {
-                std.debug.print("Unknown Opcode\n", .{});
+                std.debug.print("Unknown Opcode 0x{X:0>2}\n", .{opcode});
                 std.process.exit(0);
             },
         }
@@ -538,5 +538,38 @@ test "XOR Register Tests" {
             try std.testing.expectEqual(false, gb.registers.get_flag(Registers.Flags.H));
             try std.testing.expectEqual(false, gb.registers.get_flag(Registers.Flags.C));
         }
+    }
+}
+
+test "LD Register-Pair Tests" {
+    const io = std.testing.io;
+    const gpa = std.testing.allocator;
+    var gb = try GameBoy.init(io, gpa, null);
+    defer gb.deinit();
+    gb.bus.boot_rom_enabled = false;
+    gb.registers.pc = 257;
+
+    const opcodes = [_]u8{ 0x01, 0x11, 0x21, 0x31 };
+    const expected: u16 = 0xAAFF;
+    const low_byte: u8 = 0xFF;
+    const high_byte: u8 = 0xAA;
+
+    for (opcodes) |opcode| {
+        gb.bus.cartridge[0] = low_byte;
+        gb.bus.cartridge[1] = high_byte;
+        gb.registers.pc = 0x0000;
+
+        gb.execute(opcode);
+        const actual = switch (opcode) {
+            0x01 => gb.registers.bc,
+            0x11 => gb.registers.de,
+            0x21 => gb.registers.hl,
+            0x31 => gb.registers.sp,
+            else => unreachable,
+        };
+        std.testing.expectEqual(expected, actual) catch |err| {
+            std.debug.print("\nFailed on Opcode 0x{X:0>2}: Expected 0x{X:0>4}, got 0x{X:0>4}\n", .{ opcode, expected, actual });
+            return err;
+        };
     }
 }
