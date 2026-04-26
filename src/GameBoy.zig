@@ -292,6 +292,26 @@ pub const GameBoy = struct {
 
             0xC9 => {},
 
+            0xCC => { // CALL Z, a16
+                const low = self.bus.read(self.registers.pc);
+                const high = self.bus.read(self.registers.pc + 1);
+                const dest_addr = (@as(u16, high) << 8) | low;
+
+                self.registers.pc += 2;
+
+                if (self.registers.get_flag(Registers.Flags.Z)) {
+                    const return_addr = self.registers.pc;
+
+                    self.registers.sp -%= 1;
+                    self.bus.write(self.registers.sp, @as(u8, @intCast((return_addr >> 8) & 0xFF)));
+
+                    self.registers.sp -%= 1;
+                    self.bus.write(self.registers.sp, @as(u8, @intCast(return_addr & 0xFF)));
+
+                    self.registers.pc = dest_addr;
+                }
+            },
+
             0xCD => {
                 const low = self.bus.read(self.registers.pc);
                 const high = self.bus.read(self.registers.pc + 1);
@@ -304,6 +324,26 @@ pub const GameBoy = struct {
                 self.bus.write(self.registers.sp, @intCast(return_addr & 0xFF));
 
                 self.registers.pc = dst;
+            },
+
+            0xCE => { // ADC A, d8
+                const d8: u8 = self.bus.read(self.registers.pc);
+                self.registers.pc += 1;
+
+                const a_val = self.registers.a();
+                const carry_val: u8 = if (self.registers.get_flag(Registers.Flags.C)) 1 else 0;
+
+                const result: u16 = @as(u16, a_val) + d8 + carry_val;
+                const result_u8: u8 = @as(u8, @intCast(result & 0xFF));
+
+                const H_check = (a_val & 0x0F) + (d8 & 0x0F) + carry_val > 0x0F;
+
+                self.registers.set_a(result_u8);
+
+                self.registers.set_flag(Registers.Flags.Z, result_u8 == 0);
+                self.registers.set_flag(Registers.Flags.N, false);
+                self.registers.set_flag(Registers.Flags.H, H_check);
+                self.registers.set_flag(Registers.Flags.C, result > 0xFF);
             },
 
             0xE0, 0xF0, 0xE2, 0xF2 => {
