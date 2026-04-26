@@ -74,6 +74,10 @@ pub const GameBoy = struct {
 
     fn execute(self: *GameBoy, opcode: u16) void {
         switch (opcode) {
+            0x00 => { // NOP
+                // Program Counter already incremented in step() function
+            },
+
             0x01, 0x11, 0x21, 0x31 => { // LD reg, d16
                 const low = self.bus.read(self.registers.pc);
                 const high = self.bus.read(self.registers.pc + 1);
