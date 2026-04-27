@@ -411,27 +411,27 @@ pub const GameBoy = struct {
                 self.registers.set_flag(Registers.Flags.C, result > 0xFF);
             },
 
-            0xE0, 0xF0, 0xE2, 0xF2 => {
+            0xE0, 0xF0, 0xE2, 0xF2 => { // LD High Ram / I/O operations
                 switch (opcode) {
-                    0xE0 => {
+                    0xE0 => { // LD (a8), A - Write A to I/O port (0xFF00 + n)
                         const offset = self.bus.read(self.registers.pc);
                         self.registers.pc += 1;
                         const dst = 0xFF00 + @as(u16, offset);
 
                         self.bus.write(dst, self.registers.a());
                     },
-                    0xF0 => {
+                    0xF0 => { // LD A, (a8) - Read from I/O port (0xFF00 + n) to A
                         const offset = self.bus.read(self.registers.pc);
                         self.registers.pc += 1;
                         const src = 0xFF00 + @as(u16, offset);
 
                         self.registers.set_a(self.bus.read(src));
                     },
-                    0xE2 => {
+                    0xE2 => { // LD (C), A   - Write A to I/O port (0xFF00 + C)
                         const dst = 0xFF00 + @as(u16, self.registers.c());
                         self.bus.write(dst, self.registers.a());
                     },
-                    0xF2 => {
+                    0xF2 => { // LD A, (C)   - Read from I/O port (0xFF00 + C) to A
                         const src = 0xFF00 + @as(u16, self.registers.c());
                         self.registers.set_a(self.bus.read(src));
                     },
