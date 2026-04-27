@@ -149,6 +149,15 @@ pub const GameBoy = struct {
                 self.registers.set_flag(Registers.Flags.C, bit7 == 1);
             },
 
+            0x18 => { // JR s8
+                const steps: i8 = @bitCast(self.bus.read(self.registers.pc));
+                self.registers.pc += 1;
+
+                const new_pc = @as(i16, @intCast(self.registers.pc)) + steps;
+
+                self.registers.pc = @bitCast(new_pc);
+            },
+
             0x0A, 0x1A, 0x2A, 0x3A => {
                 const addr = switch (opcode) {
                     0x0A => self.registers.bc,
