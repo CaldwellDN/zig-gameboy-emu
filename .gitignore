@@ -3,3 +3,4 @@ scratch.txt
 zig-out/
 src/dmg_boot.bin
 *.gb
+.DS_Store

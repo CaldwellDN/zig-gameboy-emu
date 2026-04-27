@@ -439,6 +439,18 @@ pub const GameBoy = struct {
                 }
             },
 
+            0xFE => { // CP d8
+                const d8: u8 = self.bus.read(self.registers.pc);
+                self.registers.pc += 1;
+                const a_val: u8 = self.registers.a();
+
+                // Set Flags
+                self.registers.set_flag(Registers.Flags.Z, a_val == d8);
+                self.registers.set_flag(Registers.Flags.N, true);
+                self.registers.set_flag(Registers.Flags.H, (a_val & 0x0F) < (d8 & 0x0F));
+                self.registers.set_flag(Registers.Flags.C, a_val < d8);
+            },
+
             0xCB => { // 16-bit opcodes
                 const opcode_2 = self.bus.read(self.registers.pc);
                 self.registers.pc += 1;
