@@ -731,3 +731,28 @@ test "LD Register-Pair Tests" {
         };
     }
 }
+
+test "CP d8 Tests" {
+    const io = std.testing.io;
+    const gpa = std.testing.allocator;
+    var gb = try GameBoy.init(io, gpa, null);
+    defer gb.deinit();
+    gb.bus.boot_rom_enabled = false;
+    gb.registers.pc = 257;
+
+    const opcode: u8 = 0xFE;
+    const a_val: u8 = 0xAB; // 171
+    // 0xAB - 175: Zero Check; 0x2F - 47: Half Carry Check; 0xBD - 189: Carry Check
+    const test_vals = [_]u8{ 0xAB, 0x2F, 0xBD };
+
+    for (test_vals) |test_val| {
+        gb.registers.set_a(a_val);
+        gb.bus.cartridge[gb.registers.pc] = test_val;
+        gb.execute(opcode);
+
+        try std.testing.expectEqual(a_val == test_val, gb.registers.get_flag((Registers.Flags.Z)));
+        try std.testing.expectEqual(true, gb.registers.get_flag(Registers.Flags.N));
+        try std.testing.expectEqual((a_val & 0x0F) < (test_val & 0x0F), gb.registers.get_flag(Registers.Flags.H));
+        try std.testing.expectEqual(a_val < test_val, gb.registers.get_flag(Registers.Flags.C));
+    }
+}
