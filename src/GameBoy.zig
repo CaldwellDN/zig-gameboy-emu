@@ -439,6 +439,20 @@ pub const GameBoy = struct {
                 }
             },
 
+            0xEA, 0xFA => { // LD (a16), A & LD A, (a16)
+                const low = self.bus.read(self.registers.pc);
+                self.registers.pc += 1;
+                const high = self.bus.read(self.registers.pc);
+                self.registers.pc += 1;
+                const addr = (@as(u16, high) << 8) | low;
+
+                switch (opcode) {
+                    0xEA => self.bus.write(addr, self.registers.a()),
+                    0xFA => self.registers.set_a(self.bus.read(addr)),
+                    else => unreachable,
+                }
+            },
+
             0xFE => { // CP d8
                 const d8: u8 = self.bus.read(self.registers.pc);
                 self.registers.pc += 1;
